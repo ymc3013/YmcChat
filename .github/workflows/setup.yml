@@ -1,0 +1,36 @@
+
+name: YmcChat Setup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-structure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Run setup script
+        run: bash setup.sh
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Save generated folders
+        run: |
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Initialize YmcChat project structure"
+            git push origin HEAD:main
+          else
+            echo "No changes to commit."
+          fi
