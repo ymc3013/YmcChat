@@ -1,39 +1,44 @@
 
 #!/usr/bin/env bash
-
-set -e
+set -euo pipefail
 
 echo "================================"
 echo "       YmcChat Setup"
 echo "================================"
 
-# Dossiers principaux
-mkdir -p android/app
-mkdir -p server/src
-mkdir -p database/migrations
-mkdir -p docs
-mkdir -p assets/icons
-mkdir -p assets/images
-
-# Modules du serveur
-for module in auth users messages friends groups servers channels websocket notifications moderation
-do
-    mkdir -p "server/src/$module"
-    touch "server/src/$module/.gitkeep"
-done
+# Crée un dossier que Git pourra conserver
+keep_dir() {
+    mkdir -p "$1"
+    touch "$1/.gitkeep"
+}
 
 # Android
-mkdir -p android/app/src/main/java/com/ymcchat/app
-mkdir -p android/app/src/main/res/drawable
-mkdir -p android/app/src/main/res/mipmap-hdpi
-mkdir -p android/app/src/main/res/values
+keep_dir "android/app/src/main/java/com/ymcchat/app"
+keep_dir "android/app/src/main/res/drawable"
+keep_dir "android/app/src/main/res/mipmap-hdpi"
+keep_dir "android/app/src/main/res/values"
+keep_dir "android/app/src/test"
 
-# Tests
-mkdir -p server/tests
-mkdir -p android/app/src/test
+# Backend
+for module in auth users messages friends groups servers channels websocket notifications moderation
+do
+    keep_dir "server/src/$module"
+done
 
-# GitHub Actions
-mkdir -p .github/workflows
+keep_dir "server/tests"
+
+# Database
+keep_dir "database/migrations"
+
+# Assets
+keep_dir "assets/icons"
+keep_dir "assets/images"
+
+# Documentation
+keep_dir "docs"
+
+# GitHub
+keep_dir ".github/workflows"
 
 # Configuration
 touch README.md
