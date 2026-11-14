@@ -1,6 +1,6 @@
 package com.ymcchat.app.network
 
 object ApiConfig {
-    // Remplacer par ton domaine HTTPS lorsque celui-ci sera configuré.
-    const val BASE_URL = "https://YOUR-DOMAIN/"
+    // À remplacer par ton adresse HTTPS lorsque le serveur sera sécurisé.
+    const val BASE_URL = "https://TON-HOTE-HTTPS/"
 }
