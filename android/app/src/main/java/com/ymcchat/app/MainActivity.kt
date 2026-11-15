@@ -173,7 +173,7 @@ fun YmcChatApp() {
 }
 
 @Composable
-fun AuthScreen(
+private fun AuthScreen(
     repository: AuthRepository,
     palette: AppPalette,
     onAuthenticated: (com.ymcchat.app.data.auth.AuthResponse) -> Unit
@@ -265,7 +265,7 @@ fun AuthScreen(
 }
 
 @Composable
-fun AuthField(
+private fun AuthField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -295,7 +295,7 @@ fun AuthField(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
+private fun HomeScreen(
     user: AuthUser,
     palette: AppPalette,
     selectedTheme: YmcTheme,
@@ -446,7 +446,7 @@ private fun PageContent(
 }
 
 @Composable
-fun MessagesScreen(palette: AppPalette) {
+private fun MessagesScreen(palette: AppPalette) {
     val conversations = listOf(
         "Bienvenue sur YmcChat" to "Ton espace de discussion est prêt.",
         "Exemple de conversation" to "Les conversations réelles arrivent bientôt."
