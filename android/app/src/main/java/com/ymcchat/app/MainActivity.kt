@@ -37,7 +37,7 @@ private enum class YmcTheme(val label: String, val description: String) {
     LIGHT("Clair", "Fond lumineux et texte sombre")
 }
 
-private data class AppPalette(
+data class AppPalette(
     val background: Color,
     val surface: Color,
     val surfaceAlt: Color,
@@ -88,6 +88,7 @@ fun YmcChatApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember { AuthRepository() }
     var user by remember { mutableStateOf<AuthUser?>(null) }
+    var sessionToken by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var selectedTheme by remember {
         mutableStateOf(
@@ -109,8 +110,12 @@ fun YmcChatApp() {
     LaunchedEffect(Unit) {
         val token = TokenStore.get(context)
         if (token != null) {
+            sessionToken = token
             repository.me(token).onSuccess { user = it }
-                .onFailure { TokenStore.clear(context) }
+                .onFailure {
+                    TokenStore.clear(context)
+                    sessionToken = null
+                }
         }
         loading = false
     }
@@ -154,16 +159,19 @@ fun YmcChatApp() {
                     palette = palette,
                     onAuthenticated = {
                         TokenStore.save(context, it.token)
+                        sessionToken = it.token
                         user = it.user
                     }
                 )
                 else -> HomeScreen(
                     user = user!!,
+                    token = sessionToken ?: "",
                     palette = palette,
                     selectedTheme = selectedTheme,
                     onThemeChange = { selectedTheme = it },
                     onLogout = {
                         TokenStore.clear(context)
+                        sessionToken = null
                         user = null
                     }
                 )
@@ -297,13 +305,15 @@ private fun AuthField(
 @Composable
 private fun HomeScreen(
     user: AuthUser,
+    token: String,
     palette: AppPalette,
     selectedTheme: YmcTheme,
     onThemeChange: (YmcTheme) -> Unit,
     onLogout: () -> Unit
 ) {
     var selectedPage by remember { mutableStateOf("Messages") }
-    val pages = listOf("Messages", "Amis", "Communautés", "Paramètres")
+    var activeConversation by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val pages = listOf("Messages", "Friends", "Communities", "Settings")
     val icons = listOf(Icons.Default.Chat, Icons.Default.People, Icons.Default.Groups, Icons.Default.Settings)
 
     BoxWithConstraints(Modifier.fillMaxSize().background(palette.background)) {
@@ -357,7 +367,17 @@ private fun HomeScreen(
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     HomeTopBar(selectedPage, user, palette, onLogout)
                     HorizontalDivider(color = palette.border)
-                    PageContent(selectedPage, user, palette, selectedTheme, onThemeChange)
+                    PageContent(
+                        page = selectedPage,
+                        user = user,
+                        token = token,
+                        palette = palette,
+                        selectedTheme = selectedTheme,
+                        onThemeChange = onThemeChange,
+                        activeConversation = activeConversation,
+                        onOpenConversation = { id, title -> activeConversation = id to title },
+                        onBackFromConversation = { activeConversation = null }
+                    )
                 }
             }
         } else {
@@ -407,7 +427,7 @@ private fun HomeTopBar(
         title = {
             Column {
                 Text(selectedPage, color = palette.text, fontWeight = FontWeight.Bold)
-                Text("Connecté en tant que " + user.username, color = palette.muted, fontSize = 11.sp)
+                Text("Signed in as " + user.username, color = palette.muted, fontSize = 11.sp)
             }
         },
         actions = {
@@ -423,25 +443,36 @@ private fun HomeTopBar(
 private fun PageContent(
     page: String,
     user: AuthUser,
+    token: String,
     palette: AppPalette,
     selectedTheme: YmcTheme,
-    onThemeChange: (YmcTheme) -> Unit
+    onThemeChange: (YmcTheme) -> Unit,
+    activeConversation: Pair<String, String>?,
+    onOpenConversation: (String, String) -> Unit,
+    onBackFromConversation: () -> Unit
 ) {
-    when (page) {
-        "Messages" -> MessagesScreen(palette)
-        "Amis" -> PlaceholderScreen(
-            title = "Tes amis",
-            message = "Ta liste d'amis apparaîtra ici.",
-            icon = Icons.Default.People,
-            palette = palette
+    if (activeConversation != null) {
+        ConversationScreen(
+            token = token,
+            conversationId = activeConversation.first,
+            title = activeConversation.second,
+            currentUserId = user.id,
+            palette = palette,
+            onBack = onBackFromConversation
         )
-        "Communautés" -> PlaceholderScreen(
-            title = "Communautés",
-            message = "Les communautés arriveront dans une prochaine mise à jour.",
+        return
+    }
+
+    when (page) {
+        "Messages" -> MessagesScreen(token, palette, onOpenConversation)
+        "Friends" -> FriendsScreen(token, palette, onOpenConversation)
+        "Communities" -> PlaceholderScreen(
+            title = "Communities",
+            message = "Community spaces are coming in a future update.",
             icon = Icons.Default.Groups,
             palette = palette
         )
-        "Paramètres" -> SettingsScreen(user, palette, selectedTheme, onThemeChange)
+        "Settings" -> SettingsScreen(user, palette, selectedTheme, onThemeChange)
     }
 }
 
