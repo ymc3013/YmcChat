@@ -64,7 +64,11 @@ export async function messagesRoutes(app: FastifyInstance, io: Server) {
             [userId, targetId]
         );
         if (pair.rowCount) {
-            return reply.send({ conversationId: pair.rows[0].conversation_id });
+            const conversationId = pair.rows[0].conversation_id as string;
+            const room = `conversation:${conversationId}`;
+            io.in(`user:${userId}`).socketsJoin(room);
+            io.in(`user:${targetId}`).socketsJoin(room);
+            return reply.send({ conversationId });
         }
 
         const client = await database.connect();
@@ -87,6 +91,9 @@ export async function messagesRoutes(app: FastifyInstance, io: Server) {
                 [conversationId, userId, targetId]
             );
             await client.query("COMMIT");
+            const room = `conversation:${conversationId}`;
+            io.in(`user:${userId}`).socketsJoin(room);
+            io.in(`user:${targetId}`).socketsJoin(room);
             return reply.code(201).send({ conversationId });
         } catch (error: unknown) {
             await client.query("ROLLBACK");
