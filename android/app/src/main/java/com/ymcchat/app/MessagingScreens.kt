@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import com.ymcchat.app.data.messages.ChatMessage
 import com.ymcchat.app.data.messages.ConversationItem
 import com.ymcchat.app.data.messages.FriendItem
+import com.ymcchat.app.data.messages.FriendSearchUser
+import com.ymcchat.app.data.messages.FriendRequestItem
 import com.ymcchat.app.repository.MessagesRepository
 import com.ymcchat.app.network.ApiConfig
 import com.google.gson.Gson
@@ -113,14 +115,22 @@ fun FriendsScreen(
     val repository = remember { MessagesRepository() }
     val scope = rememberCoroutineScope()
     var friends by remember { mutableStateOf<List<FriendItem>>(emptyList()) }
+    var incomingRequests by remember { mutableStateOf<List<FriendRequestItem>>(emptyList()) }
+    var searchResults by remember { mutableStateOf<List<FriendSearchUser>>(emptyList()) }
+    var query by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
+    var searching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var openingFriend by remember { mutableStateOf<String?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var busyId by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
         repository.friends(token)
-            .onSuccess { friends = it; error = null }
+            .onSuccess { friends = it }
             .onFailure { error = it.message ?: "Unable to load friends." }
+        repository.friendRequests(token)
+            .onSuccess { incomingRequests = it.filter { request -> request.direction == "incoming" } }
+            .onFailure { error = it.message ?: "Unable to load friend requests." }
         loading = false
     }
 
@@ -128,45 +138,151 @@ fun FriendsScreen(
 
     Column(
         Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Column {
-            Text("Your friends", color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("Start a private conversation", color = palette.muted, fontSize = 14.sp)
+            Text("Friends", color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text("Find people and manage your friend requests", color = palette.muted, fontSize = 14.sp)
         }
-        when {
-            loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Search by username") },
+            placeholder = { Text("Enter at least 2 characters") }
+        )
+        Button(
+            onClick = {
+                if (query.trim().length >= 2 && !searching) {
+                    searching = true
+                    error = null
+                    notice = null
+                    scope.launch {
+                        repository.searchFriends(token, query.trim())
+                            .onSuccess { searchResults = it }
+                            .onFailure { error = it.message ?: "Search failed." }
+                        searching = false
+                    }
+                }
+            },
+            enabled = query.trim().length >= 2 && !searching,
+            colors = ButtonDefaults.buttonColors(containerColor = palette.accent)
+        ) {
+            if (searching) CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+            else Text("Search")
+        }
+
+        if (notice != null) Text(notice ?: "", color = palette.accent, fontSize = 13.sp)
+        if (error != null) Text(error ?: "", color = palette.accent, fontSize = 13.sp)
+
+        if (loading) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = palette.accent)
             }
-            error != null && friends.isEmpty() -> EmptyState(
-                title = "Couldn't load friends",
-                message = error ?: "",
-                palette = palette,
-                action = { scope.launch { loading = true; refresh() } }
-            )
-            friends.isEmpty() -> EmptyState(
-                title = "No friends yet",
-                message = "Accepted friends will appear here. You can then message them privately.",
-                palette = palette
-            )
-            else -> LazyColumn(
+        } else {
+            LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(9.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(friends, key = { it.id }) { friend ->
-                    FriendRow(friend, palette, openingFriend == friend.id) {
-                        if (openingFriend == null) {
-                            openingFriend = friend.id
-                            scope.launch {
-                                repository.openDirect(token, friend.id)
-                                    .onSuccess { conversationId ->
-                                        onOpenConversation(
-                                            conversationId,
-                                            friend.displayName?.takeIf { it.isNotBlank() } ?: friend.username
-                                        )
+                if (incomingRequests.isNotEmpty()) {
+                    item {
+                        Text("Incoming requests", color = palette.text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    }
+                    items(incomingRequests, key = { "request-${it.id}" }) { request ->
+                        Row(
+                            Modifier.fillMaxWidth().background(palette.surface, RoundedCornerShape(14.dp)).padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Avatar(request.displayName ?: request.username, request.userStatus, palette)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(request.displayName?.takeIf { it.isNotBlank() } ?: request.username, color = palette.text, fontWeight = FontWeight.SemiBold)
+                                Text("@${request.username}", color = palette.muted, fontSize = 12.sp)
+                            }
+                            Button(
+                                enabled = busyId == null,
+                                onClick = {
+                                    busyId = request.id
+                                    scope.launch {
+                                        repository.acceptFriendRequest(token, request.id)
+                                            .onSuccess { notice = "Friend request accepted."; refresh() }
+                                            .onFailure { error = it.message ?: "Could not accept request." }
+                                        busyId = null
                                     }
-                                    .onFailure { error = it.message ?: "Unable to open conversation." }
-                                openingFriend = null
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = palette.accent),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                if (busyId == request.id) CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                else Text("Accept")
+                            }
+                        }
+                    }
+                }
+
+                if (searchResults.isNotEmpty()) {
+                    item {
+                        Text("Search results", color = palette.text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    }
+                    items(searchResults, key = { "search-${it.id}" }) { result ->
+                        Row(
+                            Modifier.fillMaxWidth().background(palette.surface, RoundedCornerShape(14.dp)).padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Avatar(result.displayName ?: result.username, result.status, palette)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(result.displayName?.takeIf { it.isNotBlank() } ?: result.username, color = palette.text, fontWeight = FontWeight.SemiBold)
+                                Text("@${result.username}", color = palette.muted, fontSize = 12.sp)
+                            }
+                            OutlinedButton(
+                                enabled = busyId == null,
+                                onClick = {
+                                    busyId = result.id
+                                    scope.launch {
+                                        repository.addFriend(token, result.username)
+                                            .onSuccess {
+                                                notice = "Friend request sent to @${result.username}."
+                                                searchResults = searchResults.filterNot { it.id == result.id }
+                                            }
+                                            .onFailure { error = it.message ?: "Could not send friend request." }
+                                        busyId = null
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                if (busyId == result.id) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                else Text("Add")
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text("Your friends", color = palette.text, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                }
+                if (friends.isEmpty()) {
+                    item {
+                        Text("No friends yet. Search for a username above to add someone.", color = palette.muted, fontSize = 13.sp)
+                    }
+                } else {
+                    items(friends, key = { "friend-${it.id}" }) { friend ->
+                        FriendRow(friend, palette, false) {
+                            if (busyId == null) {
+                                busyId = friend.id
+                                scope.launch {
+                                    repository.openDirect(token, friend.id)
+                                        .onSuccess { conversationId ->
+                                            onOpenConversation(
+                                                conversationId,
+                                                friend.displayName?.takeIf { it.isNotBlank() } ?: friend.username
+                                            )
+                                        }
+                                        .onFailure { error = it.message ?: "Unable to open conversation." }
+                                    busyId = null
+                                }
                             }
                         }
                     }
