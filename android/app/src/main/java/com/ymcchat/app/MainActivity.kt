@@ -442,7 +442,7 @@ private fun HomeTopBar(
         },
         actions = {
             IconButton(onClick = onLogout) {
-                Icon(Icons.Default.Logout, contentDescription = "Déconnexion", tint = palette.accent)
+                Icon(Icons.Default.Logout, contentDescription = "Sign out", tint = palette.accent)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = palette.surface)
