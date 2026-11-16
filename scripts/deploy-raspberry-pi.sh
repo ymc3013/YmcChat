@@ -150,28 +150,37 @@ if (( RESTARTED )); then
   say "API and PostgreSQL are healthy."
 fi
 
-say "Looking for the latest successful Android build on $BRANCH..."
-RUN_JSON="$(gh run list --repo "$REPO" --workflow build-android.yml --branch "$BRANCH" --status success --limit 1 --json databaseId,headSha 2>/dev/null || true)"
-RUN_ID="$(printf '%s' "$RUN_JSON" | jq -r '.[0].databaseId // empty' 2>/dev/null || true)"
-RUN_SHA="$(printf '%s' "$RUN_JSON" | jq -r '.[0].headSha // empty' 2>/dev/null || true)"
-if [[ -n "$RUN_ID" ]]; then
-  if [[ "$RUN_SHA" == "$DEPLOY_COMMIT" ]]; then
-    APK_DIR="$HOME/YmcChat-apk/$RUN_ID"
-    mkdir -p "$APK_DIR"
-    gh run download "$RUN_ID" --repo "$REPO" --name YmcChat-debug --dir "$APK_DIR"
-    APK_PATH="$(find "$APK_DIR" -type f -name '*.apk' -print -quit)"
-    if [[ -n "$APK_PATH" && -s "$APK_PATH" ]]; then
-      cp "$APK_PATH" "$HOME/YmcChat-debug.apk"
-      say "APK downloaded: $HOME/YmcChat-debug.apk"
-    else
-      say "Artifact downloaded but no APK file was found."
-    fi
-  else
-    say "Latest successful APK belongs to a different commit ($RUN_SHA), not the deployed commit. It was NOT downloaded as the matching build."
-    say "Open the GitHub Actions tab and wait for the build for commit $DEPLOY_COMMIT to succeed."
+say "Waiting for the Android build for this exact commit..."
+RUN_ID=""
+RUN_STATUS=""
+RUN_CONCLUSION=""
+for attempt in $(seq 1 60); do
+  RUN_JSON="$(gh run list --repo "$REPO" --workflow build-android.yml --branch "$BRANCH" --limit 10 --json databaseId,headSha,status,conclusion 2>/dev/null || true)"
+  MATCH="$(printf '%s' "$RUN_JSON" | jq -c --arg sha "$DEPLOY_COMMIT" '[.[] | select(.headSha == $sha)] | first // empty' 2>/dev/null || true)"
+  if [[ -n "$MATCH" ]]; then
+    RUN_ID="$(printf '%s' "$MATCH" | jq -r '.databaseId // empty')"
+    RUN_STATUS="$(printf '%s' "$MATCH" | jq -r '.status // empty')"
+    RUN_CONCLUSION="$(printf '%s' "$MATCH" | jq -r '.conclusion // empty')"
+    [[ "$RUN_STATUS" == "completed" ]] && break
   fi
+  sleep 10
+done
+
+if [[ -n "$RUN_ID" && "$RUN_STATUS" == "completed" && "$RUN_CONCLUSION" == "success" ]]; then
+  APK_DIR="$HOME/YmcChat-apk/$RUN_ID"
+  mkdir -p "$APK_DIR"
+  gh run download "$RUN_ID" --repo "$REPO" --name YmcChat-debug --dir "$APK_DIR"
+  APK_PATH="$(find "$APK_DIR" -type f -name '*.apk' -print -quit)"
+  if [[ -n "$APK_PATH" && -s "$APK_PATH" ]]; then
+    cp "$APK_PATH" "$HOME/YmcChat-debug.apk"
+    say "APK downloaded: $HOME/YmcChat-debug.apk"
+  else
+    say "The workflow succeeded but no APK file was found in its artifact."
+  fi
+elif [[ -n "$RUN_ID" && "$RUN_STATUS" == "completed" ]]; then
+  say "Android build finished with conclusion: $RUN_CONCLUSION. No APK was downloaded."
 else
-  say "No successful Android workflow run found for this branch yet. The server deployment can still finish; the APK is not available yet."
+  say "No completed Android build for this commit was found within 10 minutes. The server deployment can still finish; check GitHub Actions later."
 fi
 
 say "Deployment routine finished."
