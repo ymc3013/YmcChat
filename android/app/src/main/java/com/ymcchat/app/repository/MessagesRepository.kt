@@ -12,6 +12,18 @@ class MessagesRepository {
     suspend fun friends(token: String): Result<List<FriendItem>> =
         execute { ApiClient.service.friends(auth(token)).friends }
 
+    suspend fun searchFriends(token: String, query: String): Result<List<FriendSearchUser>> =
+        execute { ApiClient.service.searchFriends(auth(token), query).users }
+
+    suspend fun friendRequests(token: String): Result<List<FriendRequestItem>> =
+        execute { ApiClient.service.friendRequests(auth(token)).requests }
+
+    suspend fun addFriend(token: String, username: String): Result<Unit> =
+        execute { ApiClient.service.addFriend(auth(token), AddFriendRequest(username)); Unit }
+
+    suspend fun acceptFriendRequest(token: String, requestId: String): Result<Unit> =
+        execute { ApiClient.service.acceptFriendRequest(auth(token), requestId); Unit }
+
     suspend fun openDirect(token: String, userId: String): Result<String> =
         execute {
             ApiClient.service.openDirect(auth(token), DirectConversationRequest(userId)).conversationId
