@@ -61,3 +61,37 @@ data class FriendItem(
     val status: String?,
     @SerializedName("status_message") val statusMessage: String?
 )
+
+data class FriendSearchResponse(
+    val users: List<FriendSearchUser>
+)
+
+data class FriendSearchUser(
+    val id: String,
+    val username: String,
+    @SerializedName("display_name") val displayName: String?,
+    @SerializedName("avatar_url") val avatarUrl: String?,
+    val bio: String?,
+    val status: String?
+)
+
+data class FriendRequestsResponse(
+    val requests: List<FriendRequestItem>
+)
+
+data class FriendRequestItem(
+    val id: String,
+    val direction: String,
+    val username: String,
+    @SerializedName("display_name") val displayName: String?,
+    @SerializedName("avatar_url") val avatarUrl: String?,
+    @SerializedName("user_status") val userStatus: String?
+)
+
+data class AddFriendRequest(
+    val username: String
+)
+
+data class ApiMessageResponse(
+    val message: String?
+)
