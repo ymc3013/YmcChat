@@ -119,6 +119,7 @@ case "$MANAGER" in
     ;;
   3)
     read -r -p "Restart your YmcChat server now, then press Enter to check it: " _
+    RESTARTED=1
     ;;
   *)
     die "Invalid choice."
