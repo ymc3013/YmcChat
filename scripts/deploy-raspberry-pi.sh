@@ -51,7 +51,7 @@ say "Target branch: $BRANCH"
 say "The target is a draft PR branch, not necessarily merged into main."
 ask_yes "Continue by deploying this exact development branch to the Raspberry Pi?" || exit 0
 
-git fetch origin "$BRANCH"
+git fetch origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
 git switch "$BRANCH" 2>/dev/null || git switch -c "$BRANCH" --track "origin/$BRANCH"
 git pull --ff-only origin "$BRANCH"
 DEPLOY_COMMIT="$(git rev-parse HEAD)"
