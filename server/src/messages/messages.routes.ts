@@ -32,7 +32,7 @@ async function isMember(conversationId: string, userId: string): Promise<boolean
          WHERE conversation_id = $1 AND user_id = $2`,
         [conversationId, userId]
     );
-    return result.rowCount > 0;
+    return result.rowCount !== null && result.rowCount > 0;
 }
 
 export async function messagesRoutes(app: FastifyInstance, io: Server) {
