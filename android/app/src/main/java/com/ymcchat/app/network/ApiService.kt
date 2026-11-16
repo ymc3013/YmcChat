@@ -7,6 +7,7 @@ import com.ymcchat.app.data.auth.LoginRequest
 import com.ymcchat.app.data.messages.*
 
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -59,4 +60,27 @@ interface ApiService {
     suspend fun friends(
         @Header("Authorization") authorization: String
     ): FriendsResponse
+
+    @GET("friends/search")
+    suspend fun searchFriends(
+        @Header("Authorization") authorization: String,
+        @Query("q") query: String
+    ): FriendSearchResponse
+
+    @POST("friends/requests")
+    suspend fun addFriend(
+        @Header("Authorization") authorization: String,
+        @Body request: AddFriendRequest
+    ): ApiMessageResponse
+
+    @GET("friends/requests")
+    suspend fun friendRequests(
+        @Header("Authorization") authorization: String
+    ): FriendRequestsResponse
+
+    @POST("friends/requests/{id}/accept")
+    suspend fun acceptFriendRequest(
+        @Header("Authorization") authorization: String,
+        @Path("id") requestId: String
+    ): ApiMessageResponse
 }
