@@ -14,6 +14,8 @@ say "This script will NOT merge the draft pull request and will never overwrite 
 command -v git >/dev/null || die "Git is missing."
 command -v node >/dev/null || die "Node.js is missing."
 command -v npm >/dev/null || die "npm is missing."
+command -v curl >/dev/null || die "curl is missing."
+command -v jq >/dev/null || die "jq is missing."
 command -v pg_dump >/dev/null || die "PostgreSQL client tools (pg_dump/psql) are missing."
 command -v psql >/dev/null || die "PostgreSQL client tools (pg_dump/psql) are missing."
 command -v gh >/dev/null || die "GitHub CLI (gh) is missing. Install it and run: gh auth login"
@@ -116,7 +118,7 @@ case "$MANAGER" in
     RESTARTED=1
     ;;
   3)
-    say "Build and migration are complete. Restart your server manually, then re-run this script's health check later."
+    read -r -p "Restart your YmcChat server now, then press Enter to check it: " _
     ;;
   *)
     die "Invalid choice."
@@ -131,14 +133,18 @@ if (( RESTARTED )); then
     sleep 2
   done
   if (( ! HEALTH_OK )); then
-    say "Health check failed. Rolling the Git working tree back to the previous commit."
-    git reset --hard "$PREVIOUS_COMMIT"
-    if [[ "$MANAGER" == "1" ]]; then
-      pm2 restart "$PM2_NAME" --update-env || true
+    if [[ "$MANAGER" == "1" || "$MANAGER" == "2" ]]; then
+      say "Health check failed. Rolling the Git working tree back to the previous commit."
+      git reset --hard "$PREVIOUS_COMMIT"
+      if [[ "$MANAGER" == "1" ]]; then
+        pm2 restart "$PM2_NAME" --update-env || true
+      else
+        sudo systemctl restart "$SERVICE_NAME" || true
+      fi
+      die "Application rollback was attempted. The additive database migration was kept; backup: $DB_BACKUP"
     else
-      sudo systemctl restart "$SERVICE_NAME" || true
+      die "Health check failed. The code was not reset because the process is manually managed. Check your server logs; backup: $DB_BACKUP"
     fi
-    die "Rollback of application code attempted. The additive database migration was kept; backup: $DB_BACKUP"
   fi
   say "API and PostgreSQL are healthy."
 fi
