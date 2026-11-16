@@ -56,11 +56,11 @@ class AuthRepository {
         } catch (error: HttpException) {
 
             val message = when (error.code()) {
-                400 -> "Informations invalides."
-                401 -> "Identifiant ou mot de passe incorrect."
-                409 -> "Ce pseudo ou cet email est déjà utilisé."
-                500 -> "Erreur interne du serveur."
-                else -> "Erreur serveur : ${error.code()}"
+                400 -> "Invalid information."
+                401 -> "Incorrect username or password."
+                409 -> "That username or email is already in use."
+                500 -> "The server encountered an internal error."
+                else -> "Server error: ${error.code()}"
             }
 
             Result.failure(Exception(message))
@@ -68,13 +68,13 @@ class AuthRepository {
         } catch (error: IOException) {
 
             Result.failure(
-                Exception("Impossible de contacter le serveur.")
+                Exception("Unable to contact the server.")
             )
 
         } catch (error: Exception) {
 
             Result.failure(
-                Exception(error.message ?: "Une erreur est survenue.")
+                Exception(error.message ?: "Something went wrong.")
             )
         }
     }

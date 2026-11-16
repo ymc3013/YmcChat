@@ -1,0 +1,38 @@
+name: YmcChat Server Check
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "server/**"
+      - "database/**"
+      - ".github/workflows/server-check.yml"
+  pull_request:
+    paths:
+      - "server/**"
+      - "database/**"
+      - ".github/workflows/server-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Build TypeScript server
+        run: npm run build
