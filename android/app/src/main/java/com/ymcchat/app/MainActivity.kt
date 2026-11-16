@@ -30,11 +30,11 @@ private const val THEME_PREFS = "ymcchat_preferences"
 private const val THEME_KEY = "selected_theme"
 
 private enum class YmcTheme(val label: String, val description: String) {
-    YMC("Ymc", "Rouge et noir — identité YmcCreations"),
-    GRAY("Gris", "Une apparence neutre et équilibrée"),
-    DARK("Sombre", "Graphite et contrastes doux"),
-    BLACK("Noir", "Noir profond pour les écrans OLED"),
-    LIGHT("Clair", "Fond lumineux et texte sombre")
+    YMC("Ymc", "Red and black — YmcCreations identity"),
+    GRAY("Gray", "A neutral, balanced appearance"),
+    DARK("Dark", "Graphite with soft contrast"),
+    BLACK("Black", "Deep black for OLED displays"),
+    LIGHT("Light", "Bright background and dark text")
 }
 
 data class AppPalette(
@@ -213,22 +213,22 @@ private fun AuthScreen(
             }
             Spacer(Modifier.height(14.dp))
             Text("YmcChat", color = palette.accent, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-            Text("Connecte-toi à ta communauté", color = palette.muted, fontSize = 14.sp)
+            Text("Connect with your community", color = palette.muted, fontSize = 14.sp)
             Spacer(Modifier.height(30.dp))
             Text(
-                if (isRegister) "Créer un compte" else "Bienvenue",
+                if (isRegister) "Create an account" else "Welcome back",
                 color = palette.text, fontSize = 23.sp, fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(20.dp))
             if (isRegister) {
-                AuthField(username, { username = it }, "Nom d'utilisateur", palette)
+                AuthField(username, { username = it }, "Username", palette)
                 Spacer(Modifier.height(12.dp))
-                AuthField(email, { email = it }, "Adresse email", palette)
+                AuthField(email, { email = it }, "Email address", palette)
             } else {
-                AuthField(identifier, { identifier = it }, "Email ou nom d'utilisateur", palette)
+                AuthField(identifier, { identifier = it }, "Email or username", palette)
             }
             Spacer(Modifier.height(12.dp))
-            AuthField(password, { password = it }, "Mot de passe", palette, true)
+            AuthField(password, { password = it }, "Password", palette, true)
             Spacer(Modifier.height(16.dp))
             if (error.isNotBlank()) {
                 Text(error, color = palette.accent)
@@ -246,7 +246,7 @@ private fun AuthScreen(
                                 repository.login(identifier.trim(), password)
                             }
                             result.onSuccess(onAuthenticated)
-                                .onFailure { error = it.message ?: "Une erreur est survenue." }
+                                .onFailure { error = it.message ?: "Something went wrong." }
                             loading = false
                         }
                     }
@@ -258,13 +258,13 @@ private fun AuthScreen(
                 if (loading) CircularProgressIndicator(
                     Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp
                 ) else Text(
-                    if (isRegister) "Créer mon compte" else "Se connecter",
+                    if (isRegister) "Create account" else "Sign in",
                     fontWeight = FontWeight.Bold
                 )
             }
             TextButton(onClick = { isRegister = !isRegister; error = "" }) {
                 Text(
-                    if (isRegister) "J'ai déjà un compte" else "Créer un compte",
+                    if (isRegister) "I already have an account" else "Create an account",
                     color = palette.muted
                 )
             }
@@ -354,8 +354,8 @@ private fun HomeScreen(
                     NavigationRailItem(
                         selected = false,
                         onClick = onLogout,
-                        icon = { Icon(Icons.Default.Logout, contentDescription = "Déconnexion") },
-                        label = { Text("Quitter") },
+                        icon = { Icon(Icons.Default.Logout, contentDescription = "Sign out") },
+                        label = { Text("Sign out") },
                         alwaysShowLabel = true,
                         colors = NavigationRailItemDefaults.colors(
                             unselectedIconColor = palette.accent,
@@ -408,7 +408,17 @@ private fun HomeScreen(
                 }
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
-                    PageContent(selectedPage, user, palette, selectedTheme, onThemeChange)
+                    PageContent(
+                        page = selectedPage,
+                        user = user,
+                        token = token,
+                        palette = palette,
+                        selectedTheme = selectedTheme,
+                        onThemeChange = onThemeChange,
+                        activeConversation = activeConversation,
+                        onOpenConversation = { id, title -> activeConversation = id to title },
+                        onBackFromConversation = { activeConversation = null }
+                    )
                 }
             }
         }
@@ -477,45 +487,6 @@ private fun PageContent(
 }
 
 @Composable
-private fun MessagesScreen(palette: AppPalette) {
-    val conversations = listOf(
-        "Bienvenue sur YmcChat" to "Ton espace de discussion est prêt.",
-        "Exemple de conversation" to "Les conversations réelles arrivent bientôt."
-    )
-    Column(
-        Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Column {
-            Text("Tes discussions", color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("Retrouve ici tes conversations.", color = palette.muted, fontSize = 14.sp)
-        }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(conversations) { conversation ->
-                Row(
-                    Modifier.fillMaxWidth().background(palette.surface, RoundedCornerShape(16.dp))
-                        .clickable { }.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        Modifier.size(48.dp).background(palette.accent, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(conversation.first, color = palette.text, fontWeight = FontWeight.SemiBold)
-                        Text(conversation.second, color = palette.muted, fontSize = 13.sp)
-                    }
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = palette.muted)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun SettingsScreen(
     user: AuthUser,
     palette: AppPalette,
@@ -527,8 +498,8 @@ private fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Personnalisation", color = palette.text, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-            Text("Choisis l'apparence de YmcChat.", color = palette.muted, fontSize = 14.sp)
+            Text("Appearance", color = palette.text, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            Text("Choose how YmcChat looks.", color = palette.muted, fontSize = 14.sp)
         }
         YmcTheme.values().forEach { theme ->
             val preview = paletteFor(theme)
@@ -560,7 +531,7 @@ private fun SettingsScreen(
             }
         }
         HorizontalDivider(color = palette.border)
-        Text("Compte", color = palette.text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        Text("Account", color = palette.text, fontSize = 19.sp, fontWeight = FontWeight.Bold)
         Column(
             Modifier.fillMaxWidth().background(palette.surface, RoundedCornerShape(14.dp)).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -569,7 +540,7 @@ private fun SettingsScreen(
             Text(user.email, color = palette.muted, fontSize = 13.sp)
         }
         Text(
-            "Ton thème est enregistré automatiquement sur cet appareil.",
+            "Your theme is saved automatically on this device.",
             color = palette.muted, fontSize = 12.sp
         )
     }
