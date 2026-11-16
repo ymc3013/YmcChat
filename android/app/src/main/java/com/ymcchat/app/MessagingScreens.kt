@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,6 +26,14 @@ import com.ymcchat.app.data.messages.ChatMessage
 import com.ymcchat.app.data.messages.ConversationItem
 import com.ymcchat.app.data.messages.FriendItem
 import com.ymcchat.app.repository.MessagesRepository
+import com.ymcchat.app.network.ApiConfig
+import com.google.gson.Gson
+import io.socket.client.IO
+import io.socket.client.Socket
+import io.socket.emitter.Emitter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -196,6 +205,35 @@ fun ConversationScreen(
         while (true) {
             delay(5000)
             refresh()
+        }
+    }
+
+    DisposableEffect(token, conversationId) {
+        val options = IO.Options()
+        options.auth = mapOf("token" to token)
+        options.reconnection = true
+        val socket = IO.socket(ApiConfig.BASE_URL.removeSuffix("/"), options)
+        val listener = Emitter.Listener { args ->
+            val payload = args.firstOrNull() as? JSONObject
+            if (payload != null) {
+                val incoming = runCatching {
+                    Gson().fromJson(payload.toString(), ChatMessage::class.java)
+                }.getOrNull()
+                if (incoming != null && incoming.conversationId == conversationId) {
+                    scope.launch(Dispatchers.Main) {
+                        if (messages.none { it.id == incoming.id }) {
+                            messages = (messages + incoming).sortedBy { it.createdAt }
+                        }
+                    }
+                }
+            }
+        }
+        socket.on("message:new", listener)
+        socket.connect()
+        onDispose {
+            socket.off("message:new", listener)
+            socket.disconnect()
+            socket.close()
         }
     }
 
