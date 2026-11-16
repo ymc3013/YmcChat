@@ -7,6 +7,7 @@ import { friendsRoutes } from "./friends/friends.routes.js";
 import { database } from "./database/connection.js";
 import { authRoutes } from "./auth/auth.routes.js";
 import { profileRoutes } from "./profile/profile.routes.js";
+import { messagesRoutes } from "./messages/messages.routes.js";
 
 // Connexions actives par utilisateur
 const activeUsers = new Map<string, Set<string>>();
@@ -105,6 +106,9 @@ export async function createApp() {
     
     await app.register(friendsRoutes);
 
+    // DIRECT MESSAGES
+    await messagesRoutes(app, io);
+
     // PRÉSENCE EN TEMPS RÉEL
     io.on("connection", async (socket) => {
         const userId = socket.data.userId as string;
@@ -112,6 +116,19 @@ export async function createApp() {
         const userRoom = `user:${userId}`;
 
         await socket.join(userRoom);
+
+        // Join every conversation room this user belongs to.
+        try {
+            const memberships = await database.query(
+                "SELECT conversation_id FROM conversation_members WHERE user_id = $1",
+                [userId]
+            );
+            for (const membership of memberships.rows) {
+                await socket.join(`conversation:${membership.conversation_id}`);
+            }
+        } catch (error) {
+            app.log.error(error, "Erreur de chargement des salons de conversation.");
+        }
 
         let connections = activeUsers.get(userId);
 
